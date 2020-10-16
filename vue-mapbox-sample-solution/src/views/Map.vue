@@ -13,7 +13,8 @@ import getCoordinatesFromGpxFile from "@/modules/gpx-utilities.js";
 export default {
   name: "Map",
   mounted: async function() {
-    console.log("map ready");
+
+    // Displaying the map
     mapboxgl.accessToken =
       "pk.eyJ1IjoibWh1c20iLCJhIjoiY2tnY2MxdGQ1MHBrYzMxa3oyc3gxMzRiNyJ9.JPZ11U69h64ksO-S4xBZlw";
     const map = new mapboxgl.Map({
@@ -23,6 +24,7 @@ export default {
       zoom: 15 // starting zoom
     });
 
+    // Displaying a GPX track
     map.on("load", async function() {
       let result = await contentfulClient.getEntries({
         content_type: "commute"
