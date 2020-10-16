@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Our Commutes</title>
+    <script src="https://cdn.jsdelivr.net/npm/contentful@latest/dist/contentful.browser.min.js"></script>
+</head>
+
+<body>
+    <h1>Our commutes</h1>
+    <ul id="commutes-list">
+    </ul>
+
+    <script type="text/javascript">
+
+        // Make sure to replace the space and access token with your values.
+        let client = contentful.createClient({
+            space: '80c03r0wfd8q',
+            accessToken: 'D_yGVdTeebDfEbT-cM-TeNGDP5zXp3e7ResHmbzbG9w'
+        })
+
+        client.getEntries({
+            content_type: 'commute'
+        })
+        .then(function (entries) {
+            entries.items.forEach(function (entry) {
+                console.log(entry.fields)
+                // Create a list item for each commute
+                let html = `<li>
+                <h2>${entry.fields.person.fields.firstname} ${entry.fields.person.fields.lastname}'s commute </h2>
+                <p>This is ${entry.fields.person.fields.firstname}
+                <img src="${entry.fields.person.fields.photo.fields.file.url}" width="600px"/>
+                </p>
+                <p>${entry.fields.person.fields.firstname} commutes from ${entry.fields.start.fields.name}
+                <img src="${entry.fields.start.fields.photo.fields.file.url}" width="600px"/>
+                to ${entry.fields.destination.fields.name}
+                <img src="${entry.fields.destination.fields.photo.fields.file.url}" width="600px"/>
+                </p>
+                </li>`;
+
+                // Add html to the DOM
+                document.querySelector("#commutes-list").innerHTML = document.querySelector("#commutes-list").innerHTML +html;
+
+            })
+        })
+    </script>
+</body>
+
+</html>
