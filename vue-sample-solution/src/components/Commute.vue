@@ -31,7 +31,4 @@ export default {
   font-weight: bold;;
 }
 
-img {
-  max-width: 600px;
-}
 </style>
