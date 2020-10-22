@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Read .gpx Track from File</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="lib/d3.v3.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+
+</head>
+<body>
+<div id="map"></div>
+<script>
+
+
+    /* Tracks */
+    //https://medium.com/@tipografico/using-mapbox-to-analyze-gpx-tracks-for-mountain-bike-638416d2d16c
+    mapboxgl.accessToken = 'pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiY2tjbmt1MjQwMGMzcDJybGZtcGR3NmR4aCJ9.HMZtdVsH8vPFyK5r5KmOHA';
+
+
+    const gpxParser = (gpx) => {
+
+        var tracks = gpx.getElementsByTagName('trk');
+
+        var trail = [];
+
+        let m=0;
+        for (let i = 0; i < tracks.length; i++) {
+            var points = tracks[i].getElementsByTagName('trkpt')
+
+            for (let x = 0; x < points.length; x=x+10) { // points.length
+
+                let point = points[x],
+                    alt = parseInt(point.getElementsByTagName('ele')[0].firstChild.nodeValue),
+                    lat = parseFloat(point.getAttribute('lat')),
+                    lng = parseFloat(point.getAttribute('lon'));
+
+
+                trail[m] = [lng, lat];
+
+                m++;
+            }
+
+
+
+        }
+
+        //console.log(trail)
+
+
+        var map = new mapboxgl.Map({
+            container: 'map', // container id
+            style: 'mapbox://styles/hzuellig/ckebefin3169l19mxdbw3pxoh', // style URL
+            center: [9.818001, 46.709736], // starting position [lng, lat]
+            zoom: 13 // starting zoom
+        });
+
+
+        map.on('load', function() {
+
+            var layers = map.getStyle().layers;
+// Find the index of the first symbol layer in the map style
+            var firstSymbolId;
+            for (var i = 0; i < layers.length; i++) {
+
+                    firstSymbolId = layers[i].id;
+                console.log(firstSymbolId)
+            }
+
+            /* add Contour Layer
+            https://stackoverflow.com/questions/38467973/mapbox-gl-js-contour-lines-elevation
+             */
+            map.addSource('contours', {
+                type: 'vector',
+                url: 'mapbox://mapbox.mapbox-terrain-v2'
+            });
+            map.addLayer({
+                'id': 'contours',
+                'type': 'line',
+                'source': 'contours',
+                'source-layer': 'contour',
+                'layout': {
+// make layer visible by default
+                    'visibility': 'visible',
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'paint': {
+                    'line-color': [
+                        "step",
+                        ["get", "ele"],
+                        "#f7fcf0", 1400,
+                        "#e5f5f9", 1600,
+                        "#e0f3db", 1800,
+                        "#ccebc5", 2000,
+                        "#a8ddb5", 2200,
+                        "#7bccc4", 2400,
+                        "#4eb3d3", 2600,
+                        "#2b8cbe", 2800,
+                        "#0868ac", 3000,
+                        "#084081",3200,
+                        "rgba(61, 130, 135, 0.5)"
+                    ]
+                    ,
+                    'line-width': 1
+                }
+            }, 'water');
+
+            map.addSource('monstein', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'Feature',
+                    'geometry': {
+                        'type': 'LineString',
+                        'coordinates': trail
+                    }
+                }
+            });
+            map.addLayer({
+                'id': 'monstein',
+                'type': 'line',
+                'source': 'monstein',
+                'layout': {
+                    'line-join':'round',
+                    'line-cap':'round'
+                },
+                'paint': {
+                    'line-color': '#084081',
+                    'line-width':3,
+                    'line-opacity':1
+                }
+            });
+
+            map.addLayer({
+                "id": "countour-labels",
+                "type": "symbol",
+                "source": {
+                    type: 'vector',
+                    url: 'mapbox://mapbox.mapbox-terrain-v2'
+                },
+                "source-layer": "contour",
+                'layout': {
+                    'visibility': 'visible',
+                    'symbol-placement': 'line',
+                    'text-field': ['concat', ['to-string', ['get', 'ele']], 'm']
+                },
+                'paint': {
+                    'icon-color': '#2b5257',
+                    'icon-halo-width': 1,
+                    'text-color': [
+                        "step",
+                        ["get", "ele"],
+                        "#f7fcf0", 1400,
+                        "#e5f5f9", 1600,
+                        "#e0f3db", 1800,
+                        "#ccebc5", 2000,
+                        "#a8ddb5", 2200,
+                        "#7bccc4", 2400,
+                        "#4eb3d3", 2600,
+                        "#2b8cbe", 2800,
+                        "#0868ac", 3000,
+                        "#084081",3200,
+                        "rgba(61, 130, 135, 0.5)"
+                    ],
+                    'text-halo-width': 1
+                }
+            })
+
+
+
+
+        });
+
+    }
+
+    d3.xml('./assets/Monstein.gpx', 'application/xml', gpxParser);
+
+
+
+
+</script>
+
+</body>
+</html>

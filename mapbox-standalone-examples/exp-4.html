@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-54392712-6');
+    </script>
+    <meta charset="utf-8" />
+    <title>Custom Contours</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+
+    <link href='https://api.mapbox.com/mapbox.js/v3.1.1/mapbox.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox.js/v3.1.1/mapbox.js'></script>
+    <!--<script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.css" rel="stylesheet" />-->
+    <script src="lib/leaflet-hash.js"></script>
+
+    <script src="https://d3js.org/d3-selection.v1.min.js"></script>
+    <script src="https://d3js.org/d3-contour.v1.min.js"></script>
+    <script src="https://d3js.org/d3-geo.v1.min.js"></script>
+    <script src="https://d3js.org/d3-array.v1.min.js"></script>
+    <script src="https://d3js.org/d3-collection.v1.min.js"></script>
+    <script src="https://d3js.org/d3-color.v1.min.js"></script>
+    <script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
+    <script src="https://d3js.org/d3-scale.v2.min.js"></script>
+    <script src="https://d3js.org/d3-request.v1.min.js"></script>
+    <script src="https://d3js.org/d3-dispatch.v1.min.js"></script>
+    <script src="https://d3js.org/d3-dsv.v2.min.js"></script>
+    <script src="https://d3js.org/d3-fetch.v2.min.js"></script>
+
+        <style>
+        html, body {
+            margin: 0;
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            color: #111;
+        }
+        #wrapper {
+            position: relative;
+        }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height:100vh; }
+        .leaflet-left {
+            left: 60px;
+            transition: left .5s;
+            top: 30px;
+        }
+        #loading{
+            z-index: 101;
+            position: absolute; top: 0; bottom: 0; width: 100%; height:100vh;
+        }
+        .leaflet-map-pane canvas {
+            z-index: 100;
+        }
+        .leaflet-map-pane canvas#trails {
+            z-index: 200;
+        }
+        canvas {position: absolute; top:0; left:0;}
+        .leaflet-container{ background: white;}
+
+
+    </style>
+
+
+</head>
+<body>
+<div id='wrapper'>
+    <div id="map"></div>
+</div>
+<div id="loading">Drawing contours...</div>
+<script>
+    /*
+    Weiterentwicklungen?
+    Contour Lines Color based on elevation: https://docs.mapbox.com/vector-tiles/reference/mapbox-terrain-v2/
+    Add Labels to Contour Lines: https://stackoverflow.com/questions/38467973/mapbox-gl-js-contour-lines-elevation
+     https://www.axismaps.com/blog/2018/04/contours-in-browser/
+     http://andywoodruff.com/blog/hachures-and-sketchy-relief-maps/
+     https://blog.mapbox.com/visualizing-radar-data-with-vector-tiles-117bc5ee9a5a
+
+
+     Based on: https://github.com/axismaps/contours (MIT License)
+    */
+
+    var trailCanvas = document.createElement('canvas');
+    trailCanvas.id='trails';
+    var trailContext = trailCanvas.getContext('2d');
+
+    var contourCanvas = document.createElement('canvas');
+    contourCanvas.id='contours';
+    var contourContext;
+    var buffer = 5; // for a small buffer around the window, so we don't see lines around the edges
+
+    // invisible canvas to which Mapzen elevation tiles will be drawn so we can calculate stuff
+    var demCanvas = document.createElement('canvas');
+    var demContext;
+    var demImageData;
+    var demData;
+
+    var contourContext = contourCanvas.getContext('2d');
+    var demContext = demCanvas.getContext('2d');
+
+
+
+    var mapNode = d3.select('#map').node();
+    var width = mapNode.offsetWidth + 2*buffer;
+    var height = mapNode.offsetHeight + 2*buffer;
+    contourCanvas.width = width;
+    contourCanvas.height = height;
+    demCanvas.width = width;
+    demCanvas.height = height;
+    trailCanvas.width = width;
+    trailCanvas.height = height;
+
+    var path = d3.geoPath().context(contourContext);
+    var svgPath = d3.geoPath();
+
+    var min;
+    var max;
+    var interval;
+    var majorInterval = 0;
+    var thresholds;
+    var contour = d3.contours()
+        .size([width, height]);
+    var contoursGeoData;
+
+    var wait;
+
+    //styles
+    var type = 'illuminated';//line
+    var unit = 'm';
+
+    var lineWidth = .75;
+    var lineWidthMajor = 1.5;
+    var lineColor = '#8c7556';
+
+    var highlightColor = 'rgba(177,174,164,.5)';
+    var shadowColor = '#5b5143';
+    var shadowSize = 2;
+
+    var colorType = '';
+    var solidColor = '#fffcfa';
+    var hypsoColor = d3.scaleLinear()
+        .domain([0, 6000])
+        .range(["rgb(72,90,65)", "rgb(229,217,201)"])
+        ;
+    var oceanColor = '#d5f2ff';
+    var bathyColorType = 'none';
+    var bathyColor = d3.scaleLinear()
+        .domain([0, 6000])
+        .range(["#315d9b", "#d5f2ff"]);
+
+    var contourSVG;
+
+    var exampleLocations = [
+        {name: 'Davos', coords: [46.749925,9.947718, 11]}
+    ];
+
+
+    var map_start_location = exampleLocations[Math.floor(Math.random()*exampleLocations.length)].coords;
+
+    var url_hash = window.location.hash.slice(1, window.location.hash.length).split('/');
+
+    if (url_hash.length == 3) {
+        map_start_location = [url_hash[1],url_hash[2], url_hash[0]];
+        map_start_location = map_start_location.map(Number);
+    }
+
+    /* Tracks */
+    var trail = [];
+    var trailPoints = [];
+
+    L.mapbox.accessToken = 'pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiY2tjbmt1MjQwMGMzcDJybGZtcGR3NmR4aCJ9.HMZtdVsH8vPFyK5r5KmOHA';
+
+    //d3.xml('./assets/Monstein.gpx', gpxParser);
+    //d3.xml('./assets/Monstein.gpx', 'application/xml', gpxParser);
+    d3.xml("./assets/Fluela.gpx", function(gpx) {
+
+    }).then(function(gpx) {
+        var tracks = gpx.getElementsByTagName('trk');
+
+        /*var test_latlng = L.latLng(46.709736, 9.818001);
+        var p = map.latLngToLayerPoint(test_latlng);
+        console.log(p);*/
+
+
+
+        let m = 0;
+        for (let i = 0; i < tracks.length; i++) {
+            var points = tracks[i].getElementsByTagName('trkpt')
+
+            for (let x = 0; x < points.length; x = x + 2) { // points.length
+
+                let point = points[x],
+                    alt = parseInt(point.getElementsByTagName('ele')[0].firstChild.nodeValue),
+                    lat = parseFloat(point.getAttribute('lat')),
+                    lng = parseFloat(point.getAttribute('lon'));
+
+
+
+                trail[m] = [lat, lng];
+
+                m++;
+
+                //console.log(p);
+            }
+
+
+        }
+
+    });
+
+    var map = L.mapbox.map('map',null,{scrollWheelZoom: false});
+    var hash = new L.Hash(map);
+    map.setView(map_start_location.slice(0, 3), map_start_location[2]);
+
+    map.on('moveend', function() {
+        // on move end we redraw the contour layer, so clear some stuff
+
+        contourContext.clearRect(0,0,width,height);
+        trailContext.clearRect(0,0,width,height);
+        clearTimeout(wait);
+        wait = setTimeout(getRelief,500);  // redraw after a delay in case map is moved again soon after
+    });
+
+    map.on('move', function() {
+        // stop things so it doesn't redraw in the middle of panning
+        clearTimeout(wait);
+    });
+
+    // custom tile layer for the Mapzen elevation tiles
+    // it returns div tiles but doesn't display anyting; images are saved but only drawn to an invisible canvas (demCanvas)
+    var CanvasLayer = L.GridLayer.extend({
+        createTile: function(coords){
+            var tile = L.DomUtil.create('div', 'leaflet-tile');
+            var img = new Image();
+            var self = this;
+            img.crossOrigin = '';
+            tile.img = img;
+            img.onload = function() {
+                // we wait for tile images to load before we can redraw the map
+                clearTimeout(wait);
+                wait = setTimeout(getRelief,500); // only draw after a reasonable delay, so that we don't redraw on every single tile load
+            }
+            img.src = 'https://elevation-tiles-prod.s3.amazonaws.com/terrarium/'+coords.z+'/'+coords.x+'/'+coords.y+'.png'
+            return tile;
+        }
+    });
+    var demLayer = new CanvasLayer({attribution: '<a href="https://aws.amazon.com/public-datasets/terrain/">Elevation tiles</a> by Mapzen'}).addTo(map);
+
+    // custom map pane for the contours, above other layers
+    var pane = map.createPane('contour');
+    pane.appendChild(contourCanvas);
+    pane.appendChild(trailCanvas);
+
+    // custom map pane for the labels
+    var labelPane = map.createPane('labels');
+    var referenceLayer = L.mapbox.styleLayer('mapbox://styles/hzuellig/ckebefin3169l19mxdbw3pxoh', {
+        minZoom: 0,
+        maxZoom: 16,
+        pane: 'labels',
+    }).addTo(map);
+    reverseTransform();
+
+    // this resets our canvas back to top left of the window after panning the map
+    function reverseTransform() {
+        var top_left = map.containerPointToLayerPoint([-buffer, -buffer]);
+        L.DomUtil.setPosition(contourCanvas, top_left);
+    };
+
+    // this is to ensure the "loading" message gets a chance to show. show it then do the function (usually getRelief or drawContours) on next frame
+    function load (fn) {
+        requestAnimationFrame(function () {
+            d3.select('#loading').style('display', 'flex');
+            requestAnimationFrame(fn);
+        });
+    }
+
+    // after terrain tiles are loaded, kick things off by drawing them to a canvas
+    function getRelief(){
+        load(function() {
+            // reset canvases
+            demContext.clearRect(0,0,width,height);
+            reverseTransform();
+
+            // reset DEM data by drawing elevation tiles to it
+            for (var t in demLayer._tiles) {
+                var rect = demLayer._tiles[t].el.getBoundingClientRect();
+                demContext.drawImage(demLayer._tiles[t].el.img,rect.left + buffer,rect.top + buffer);
+            }
+            demImageData = demContext.getImageData(0,0,width,height);
+            demData = demImageData.data;
+
+            getContours();
+
+
+        });
+    }
+
+    // calculate contours
+    function getContours () {
+        var values = new Array(width*height);
+        // get elevation values for pixels
+        for (var y=0; y < height; y++) {
+            for (var x=0; x < width; x++) {
+                var i = getIndexForCoordinates(width, x,y);
+                // x + y*width is the array position expected by the contours generator
+                values[x + y*width] = Math.round(elev(i, demData) * (unit == 'ft' ? 3.28084 : 1));
+            }
+        }
+
+        max = d3.max(values);
+        min = d3.min(values);
+
+        interval = 200;
+
+        console.log(min);
+        console.log(max);
+
+        max = Math.ceil(max/interval) * interval;
+        min = Math.floor(min/interval) * interval;
+
+        // the countour line values
+        thresholds = [];
+        for (var i = min; i <= max; i += interval) {
+            thresholds.push(i);
+        }
+        contour.thresholds(thresholds);
+
+        contoursGeoData = contour(values);  // this gets the contours geojson
+
+        hypsoColor.domain([min,max]);
+
+
+        majorInterval = 2 * interval;
+        hypsoColor.domain([0, max]);
+
+        //console.log(contoursGeoData)
+
+
+
+        drawContours();
+    }
+
+    // draw the map!
+    function drawContours(svg) {
+        // svg option is for export
+        if (svg !== true) { // this is the normal canvas drawing
+            contourContext.clearRect(0,0,width,height);
+            contourContext.save();
+            if (type == 'illuminated') {
+                contourContext.lineWidth = shadowSize + 1;
+                contourContext.shadowBlur = shadowSize;
+                contourContext.shadowOffsetX = shadowSize;
+                contourContext.shadowOffsetY = shadowSize;
+
+                contoursGeoData.forEach(function (c) {
+
+                    if(c.value > 0 && c.value < 6000){
+                        //console.log(c);
+                        contourContext.beginPath();
+                        if (c.value >= 0 || bathyColorType == 'none') { // for values above sea level (or if we aren't styling bahymetry)
+                            contourContext.shadowColor = shadowColor;
+                            contourContext.strokeStyle = highlightColor;
+                            if (colorType == 'hypso') contourContext.fillStyle = hypsoColor(c.value);
+                            else if (colorType == 'solid') contourContext.fillStyle = solidColor;
+                            else contourContext.fillStyle = '#fff'; // fill can't really be transparent in this style, so "none" is actually white
+                        } else {
+                            // blue-ish shadow and highlight colors below sea level
+                            // no user option for these colors because I'm lazy
+                            contourContext.shadowColor = '#4e5c66';
+                            contourContext.strokeStyle = 'rgba(224, 242, 255, .5)';
+                            if (bathyColorType == 'bathy') contourContext.fillStyle = bathyColor(c.value);
+                            else if (bathyColorType == 'solid') contourContext.fillStyle = oceanColor;
+                            else contourContext.fillStyle = '#fff';
+                        }
+                        path(c);  // draws the shape (You can see that this generated SVG Path Mini-Language instructions.)
+                        //https://github.com/d3/d3-geo/blob/v2.0.0/README.md#_path
+                        // draw the light stroke first, then the fill with drop shadow
+                        // the effect is a light edge on side and dark on the other, giving the raised/illuminated contour appearance
+                        contourContext.stroke();
+                        contourContext.fill();
+                    }
+
+                });
+            } else {  // regular contour lines
+                contourContext.lineWidth = lineWidth;
+                contourContext.strokeStyle = lineColor;
+                if (colorType != 'hypso' && bathyColorType == 'none') {
+                    // no fill or solid fill. we don't have to fill/stroke individual contours, but rather can do them all at once
+                    contourContext.beginPath();
+                    contoursGeoData.forEach(function (c) {
+                        if (majorInterval == 0 || c.value % majorInterval != 0) path(c);
+                    });
+                    if (colorType == 'solid') {
+                        contourContext.fillStyle = solidColor;
+                        contourContext.fill();
+                    }
+                    contourContext.stroke();
+                } else {
+                    // for hypsometric tints or a separate bathymetric fill, we have to fill contours one at a time
+                    contoursGeoData.forEach(function (c) {
+                        contourContext.beginPath();
+                        var fill;
+                        if (c.value >= 0 || bathyColorType == 'none') {
+                            if (colorType == 'hypso') fill = hypsoColor(c.value);
+                            else if (colorType == 'solid') fill = solidColor;
+                            else if (bathyColorType != 'none') fill = '#fff'; // to mask out ocean if ocean is colored
+                        } else {
+                            if (bathyColorType == 'bathy') fill = bathyColor(c.value);
+                            else if (bathyColorType == 'solid') fill = oceanColor;
+                        }
+                        path(c);
+                        if (fill) {
+                            contourContext.fillStyle = fill;
+                            contourContext.fill();
+                        }
+                        contourContext.stroke();
+                    });
+                }
+
+                // draw thicker index lines, if desired
+                if (majorInterval != 0) {
+                    contourContext.lineWidth = lineWidthMajor;
+                    contourContext.beginPath();
+                    contoursGeoData.forEach(function (c) {
+                        if (c.value % majorInterval == 0) path(c);
+                    });
+                    contourContext.stroke();
+                }
+
+            }
+            contourContext.restore();
+        } else {
+            // draw contours to SVG for export
+            if (!contourSVG) {
+                contourSVG = d3.select('body').append('svg');
+            }
+            contourSVG
+                .attr('width', width)
+                .attr('height', height)
+                .selectAll('path').remove();
+
+            contourSVG.selectAll('path.stroke')
+                .data(contoursGeoData)
+                .enter()
+                .append('path')
+                .attr('d', svgPath)
+                .attr('stroke', type == 'lines' ? lineColor : highlightColor)
+                .attr('stroke-width', function (d) {
+                    return type == 'lines' ? (majorInterval != 0 && d.value % majorInterval == 0 ? lineWidthMajor : lineWidth) : shadowSize;
+                })
+                .attr('fill', function (d) {
+                    if (d.value >= 0 || bathyColorType == 'none') {
+                        if (colorType == 'hypso') return hypsoColor(d.value);
+                        else if (colorType == 'solid') return solidColor;
+                        else if (bathyColorType != 'none') return '#fff'; // to mask out ocean if ocean is colored
+                    } else {
+                        if (bathyColorType == 'bathy') return bathyColor(d.value);
+                        else if (bathyColorType == 'solid') return oceanColor;
+                    }
+                    return 'none';
+                })
+                .attr('id', function (d) {
+                    return 'elev-' + d.value;
+                });
+        }
+        d3.select('#loading').style('display', 'none');
+
+       // var polyline = L.polyline(trail, {color: '#5B5143'}).addTo(map);
+        //map.fitBounds(polyline.getBounds());
+        //console.log(trail)
+
+        drawTrail();
+
+    }
+
+    function drawTrail(){
+
+
+
+        trailContext.clearRect(0,0,width,height);
+        trailContext.save();
+        trailContext.lineWidth = 4;
+        //trailContext.setLineDash([4, 6]);
+        trailContext.strokeStyle = '#5B5143';
+
+
+
+        trailContext.beginPath();
+
+        //trailContext.moveTo(trailPoints[0].x, trailPoints[0].y);
+        for(let n=0;n<trail.length;n++){
+            var p = map.latLngToLayerPoint(new L.LatLng(trail[n][0], trail[n][1]));
+            trailContext.lineTo(p.x, p.y);
+            //console.log(trailPoints[n]);
+
+
+        }
+
+
+        trailContext.stroke();
+        trailContext.restore();
+    }
+    // convert elevation tile color to elevation value
+    function elev(index, demData) {
+        if (index < 0 || demData[index] === undefined) return undefined;
+        return (demData[index] * 256 + demData[index+1] + demData[index+2] / 256) - 32768;
+    }
+
+    // helper to get imageData index for a given x/y
+    function getIndexForCoordinates(width, x,y) {
+        return width * y * 4 + 4 * x;
+    }
+
+    /*function toRGBA (color) {
+        if (color.substr(0, 1) == '#') return hexToRGBA(color).replace(/\s/g, '');
+        if (color.split(',').length == 4) return color.replace(/\s/g, ''); // already rgba
+        return 'rgba' + color.substring(3, color.indexOf(')')).replace(/\s/g, '') + ',1)';
+    }
+
+    function hexToRGBA (hex) {
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? 'rgba(' + parseInt(result[1], 16) + ',' + parseInt(result[2], 16) + ',' + parseInt(result[3], 16) + ',1)' : null;
+    }
+
+    function toHex (rgba) {
+        if (rgba[0] == '#') {
+            var vals = rgba.slice(1);
+            if (vals.length == 3) {
+                return '#' + vals[0] + vals[0] + vals[1] + vals[1] + vals[2] + vals[2];
+            }
+            return rgba;
+        }
+        var numbers = rgba.substr(rgba.indexOf('(') + 1, rgba.indexOf(')')).split(',').map(function (n) { return parseInt(n); });
+        var r = numbers[0];
+        var g = numbers[1];
+        var b = numbers[2];
+        return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+*/
+
+</script>
+
+</body>
+</html>

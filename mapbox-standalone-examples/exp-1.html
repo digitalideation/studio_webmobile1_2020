@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>add custom style</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v1.12.0/mapbox-gl.css" rel="stylesheet" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    /* embed your custom style */
+    mapboxgl.accessToken = 'pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiY2tjbmt1MjQwMGMzcDJybGZtcGR3NmR4aCJ9.HMZtdVsH8vPFyK5r5KmOHA';
+    var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/hzuellig/ckebc1msk142z1amv3wdpeygt', // style URL
+        center: [9.821014, 46.791741], // starting position [lng, lat]
+        zoom: 12 // starting zoom
+    });
+
+    map.on('load', function() {
+        // add source and layer for contours
+        // https://docs.mapbox.com/mapbox-gl-js/example/geojson-layer-in-stack/ z-order
+
+// Find the index of the first symbol layer in the map style
+
+        map.addSource('contours', {
+            type: 'vector',
+            url: 'mapbox://mapbox.mapbox-terrain-v2'
+        });
+        map.addLayer({
+            'id': 'contours',
+            'type': 'line',
+            'source': 'contours',
+            'source-layer': 'contour',
+            'layout': {
+                'visibility': 'visible',
+                'line-join': 'round',
+                'line-cap': 'round'
+            },
+            'paint': {
+                'line-color': '#000000',
+                'line-width': 1
+            }
+        },
+            "hzuellig-8kjf3u8p");
+
+    });
+</script>
+
+</body>
+</html>
