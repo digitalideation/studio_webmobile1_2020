@@ -87,7 +87,7 @@
             this.min = this.min;  // this will call the min setter
         }
     }
-    //https://github.com/w3reality/three-geo
+    //--- examples: https://github.com/w3reality/three-geo
     const allpathpoints = [];
     var step=0;
 
@@ -261,30 +261,7 @@
 
     }
 
-    const getImg = (url, key) => {
-        var canvas = document.createElement('canvas'),
-            ctx = canvas.getContext('2d');
-        //size canvas
-        canvas.width = 512;
-        canvas.height = 512;
 
-
-//create image, set src to base64 and onload draw to canvas
-        var image = new Image();
-        image.src = url;
-
-        image.onload = (function(canvas, ctx){
-            return function(){
-                ctx.drawImage(this, 0, 0);
-
-                //now we can finally get a Uint8ClampedArray
-                var imageData = ctx.getImageData(0, 0, 512, 512);
-                data[key]=imageData.data;
-
-            }
-        })(canvas, ctx);
-
-    }
 
     //..................three-geo .......................
     const ioToken = 'pk.eyJ1IjoiamRldmVsIiwiYSI6ImNqemFwaGJoZjAyc3MzbXA1OGNuODBxa2EifQ.7M__SgfWZGJuEiSqbBXdoQ';
@@ -292,9 +269,7 @@
         tokenMapbox: 'pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiY2tjbmt1MjQwMGMzcDJybGZtcGR3NmR4aCJ9.HMZtdVsH8vPFyK5r5KmOHA' // <---- set your Mapbox API token here
 
     });
-    //tgeo.setApiSatellite('https://api.mapbox.com/styles/v1/hzuellig/ckdh8grzw0yjd1ilabs13vwxx/tiles');
-    //console.log(tgeo)
-    ;
+
     if (tgeo.tokenMapbox === ioToken && window.location.origin !== 'https://w3reality.github.io') {
         const warning = 'Please set your own Mapbox API token in the ThreeGeo constructor.';
         alert(warning);
