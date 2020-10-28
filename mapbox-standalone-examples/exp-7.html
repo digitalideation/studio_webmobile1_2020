@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+    <title>Mapbox and Three.js</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&display=swap" rel="stylesheet">
+    <style>
+        body{
+            background: rgb(223,191,143);
+            background: linear-gradient(180deg, rgba(223,191,143,0.8295693277310925) 2%, rgba(23,134,217,1) 31%, rgba(219,238,247,1) 76%);padding:0px;
+            margin:0px;
+            width:100vw;
+            min-height:100vh;
+        }
+        #nav{
+            position:absolute;
+            z-index:500;
+            top:20px;
+            right:20px;
+
+
+        }
+
+        #nav, #nav a{
+            font-family: 'Fjalla One', sans-serif;
+            color: #ffc620;
+            text-transform: uppercase;
+            font-size:2.5rem;
+            display:none;
+        }
+
+        .label{
+            font-family: 'Fjalla One', sans-serif;
+            color: #0b194e;
+            font-size:1.1rem;
+
+        }
+
+        #canvas{
+
+            position:absolute;
+        }
+        canvas{
+            overflow:hidden;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="canvas" style="width: 100%; height: 100%;"></canvas>
+<nav id="nav">Summer Trails</nav>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
+<script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
+
+<script src="lib/threelet.min.js"></script>
+
+<script src="lib/three-geo.js"></script> <!-- see three-geo license !! -->
+
+<script src="lib/d3.v3.js"></script>
+
+<script type="module">
+    import { CSS2DRenderer, CSS2DObject } from 'https://threejs.org/examples/jsm/renderers/CSS2DRenderer.js';
+    import {GUI} from 'https://threejsfundamentals.org/threejs/../3rdparty/dat.gui.module.js';
+    var myColor = d3.scale.linear().domain([1000, 1500,2000, 2500, 3000]).range(["#181e40", "#5b8557", "#b02e2b", "#64b6ea", "#cd8c63"]);
+
+    class MinMaxGUIHelper {
+        constructor(obj, minProp, maxProp, minDif) {
+            this.obj = obj;
+            this.minProp = minProp;
+            this.maxProp = maxProp;
+            this.minDif = minDif;
+        }
+        get min() {
+            return this.obj[this.minProp];
+        }
+        set min(v) {
+            this.obj[this.minProp] = v;
+            this.obj[this.maxProp] = Math.max(this.obj[this.maxProp], v + this.minDif);
+        }
+        get max() {
+            return this.obj[this.maxProp];
+        }
+        set max(v) {
+            this.obj[this.maxProp] = v;
+            this.min = this.min;  // this will call the min setter
+        }
+    }
+    //https://github.com/w3reality/three-geo
+    const allpathpoints = [];
+    var step=0;
+
+
+    var mouse = new THREE.Vector2();
+
+
+    var labelRenderer;
+
+
+    const canvas = document.getElementById("canvas");
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.01, 1000 );
+    camera.position.set(-1, 0.3, 0.5);
+
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha:true });
+    renderer.setSize( window.innerWidth, window.innerHeight );
+
+
+    labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize( window.innerWidth, window.innerHeight );
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    document.body.appendChild( labelRenderer.domElement );
+
+    const controls = new THREE.OrbitControls(camera, labelRenderer.domElement);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.5;
+
+    controls.update();
+
+    //cmaera
+    function updateCamera() {
+        camera.updateProjectionMatrix();
+    }
+
+    const gui = new GUI();
+    gui.add(camera, 'fov', 1, 180).onChange(updateCamera);
+    const minMaxGUIHelper = new MinMaxGUIHelper(camera, 'near', 'far', 0.1);
+    gui.add(minMaxGUIHelper, 'min', 0.1, 50, 0.1).name('near').onChange(updateCamera);
+    gui.add(minMaxGUIHelper, 'max', 0.1, 50, 0.1).name('far').onChange(updateCamera);
+    var cameraController = {
+
+        posX: -1,
+        posY: 0.3,
+        posZ: 0.5
+    };
+
+    function cameraChanger() {
+        //console.log(cameraController['x']);
+        camera.position.set( cameraController['posX'] , cameraController['posY'] , cameraController['posZ'] );
+    }
+
+    gui.add(cameraController, 'posX', -2, 2, 0.1).onChange(cameraChanger);
+    gui.add(cameraController, 'posY', -2, 2, 0.1).onChange(cameraChanger);
+    gui.add(cameraController, 'posZ', -2, 2, 0.1).onChange(cameraChanger);
+
+
+    //lights
+    const color = 0xffc620;
+    const intensity = 2;
+    const light = new THREE.DirectionalLight(color, intensity);
+    light.position.set(0, 0.5, 0.5);
+    light.target.position.set(0, 0, 0);
+    scene.add(light);
+    scene.add(light.target);
+
+    light.shadow.mapSize.width = 1024;  // default
+    light.shadow.mapSize.height = 1024; // default
+    light.shadow.camera.near = 0.1;    // default
+    light.shadow.camera.far = 1000;     // default
+
+
+    const render = () => {
+        //stats.update();
+        renderer.render(scene, camera);
+        labelRenderer.render( scene, camera );
+    };
+
+    controls.addEventListener('change', render);
+    render();
+
+
+
+    const onDocumentMouseMove = (event) => {
+
+        event.preventDefault();
+
+
+
+        mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+        mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+    }
+
+
+    document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+
+    //..................Track.......................
+
+
+    const addPoint = (dot) => {
+
+
+
+        let material = new THREE.LineBasicMaterial({
+            color: "#ffc149"
+        });
+
+        var pts = [];
+        pts.push( new THREE.Vector3( dot.geometry.vertices[0].x, dot.geometry.vertices[0].y, dot.geometry.vertices[0].z ) );
+        pts.push( new THREE.Vector3( dot.geometry.vertices[0].x, 0, dot.geometry.vertices[0].z ) );
+
+
+        var geometry = new THREE.BufferGeometry().setFromPoints( pts );
+
+        var line = new THREE.Line( geometry, material );
+        scene.add( line );
+
+        scene.add( dot );
+
+
+        //scene.add(dot);
+        if(dot.description !=""){
+            //alert(dot.description);
+            var labelDiv = document.createElement( 'div' );
+            labelDiv.className = 'label';
+            labelDiv.textContent = dot.description;
+            labelDiv.style.marginTop = '-0.2em';
+            //labelDiv.style.color = myColor(dot.realaltitude);
+
+            var Label = new CSS2DObject( labelDiv );
+            Label.position.set( dot.geometry.vertices[0].x, 0, dot.geometry.vertices[0].z );
+            dot.add( Label );
+            //console.log(dot)
+        }
+    };
+
+    const animate = () => {
+
+
+        let framesPerSecond = 30;
+
+        setTimeout(function() {
+            requestAnimationFrame(animate);
+
+            controls.update();
+            /*if(camera.position.x > -1){
+             camera.position.x-=0.002;
+             }*/
+
+
+            if(step < allpathpoints.length - 1){
+                addPoint(allpathpoints[step]);
+                step++;
+            }
+
+
+
+            renderer.render( scene, camera );
+            labelRenderer.render( scene, camera );
+
+
+        }, 1000 / framesPerSecond);
+
+
+
+
+
+    }
+
+    const getImg = (url, key) => {
+        var canvas = document.createElement('canvas'),
+            ctx = canvas.getContext('2d');
+        //size canvas
+        canvas.width = 512;
+        canvas.height = 512;
+
+
+//create image, set src to base64 and onload draw to canvas
+        var image = new Image();
+        image.src = url;
+
+        image.onload = (function(canvas, ctx){
+            return function(){
+                ctx.drawImage(this, 0, 0);
+
+                //now we can finally get a Uint8ClampedArray
+                var imageData = ctx.getImageData(0, 0, 512, 512);
+                data[key]=imageData.data;
+
+            }
+        })(canvas, ctx);
+
+    }
+
+    //..................three-geo .......................
+    const ioToken = 'pk.eyJ1IjoiamRldmVsIiwiYSI6ImNqemFwaGJoZjAyc3MzbXA1OGNuODBxa2EifQ.7M__SgfWZGJuEiSqbBXdoQ';
+    const tgeo = new ThreeGeo({
+        tokenMapbox: 'pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiY2tjbmt1MjQwMGMzcDJybGZtcGR3NmR4aCJ9.HMZtdVsH8vPFyK5r5KmOHA' // <---- set your Mapbox API token here
+
+    });
+    //tgeo.setApiSatellite('https://api.mapbox.com/styles/v1/hzuellig/ckdh8grzw0yjd1ilabs13vwxx/tiles');
+    //console.log(tgeo)
+    ;
+    if (tgeo.tokenMapbox === ioToken && window.location.origin !== 'https://w3reality.github.io') {
+        const warning = 'Please set your own Mapbox API token in the ThreeGeo constructor.';
+        alert(warning);
+        throw warning;
+    }
+
+    //var proj, unitsPerMeter  = tgeo.getProjection(origin, radius);
+
+
+
+
+    const origin = [46.7132562, 9.7580495];
+    const radius = 4;
+
+    //..................Terrain.......................
+    //http://www.qgistutorials.com/en/docs/3/georeferencing_basics.html
+
+
+    const gpxParser = (gpx) => {
+
+        var tracks = gpx.getElementsByTagName('trk');
+
+        const { proj, unitsPerMeter } = tgeo.getProjection(origin, radius);
+
+
+        for (let i = 0; i < tracks.length; i++) {
+            var points = tracks[i].getElementsByTagName('trkpt')
+            var pts=[]
+            for (let x = 0; x < points.length; x++) { // points.length
+
+                let point = points[x],
+                    alt = parseInt(point.getElementsByTagName('ele')[0].firstChild.nodeValue),
+                    lat = parseFloat(point.getAttribute('lat')),
+                    lng = parseFloat(point.getAttribute('lon')),
+                    coord = proj([lat, lng]);
+                let desc="";
+                if(point.hasAttribute("desc")){
+                    desc= point.getAttribute('desc');
+                }
+
+                //let c = myColor(alt);
+
+                let dot = new THREE.Points(
+                    new THREE.Geometry(),
+                    new THREE.PointsMaterial({
+                        size: 5,
+                        sizeAttenuation: false,
+                        color: "#ffc620",
+                    }));
+
+                dot.geometry.vertices.push(new THREE.Vector3(
+                    coord[0], (alt + 100) * unitsPerMeter , -coord[1]));
+                dot.description = desc;
+                dot.realaltitude=alt;
+                allpathpoints.push(dot);
+
+            }
+
+
+
+        }
+
+
+        render();
+        animate();
+
+    }
+
+    (async () => {
+
+        const terrain = await tgeo.getTerrainRgb(origin, radius, 12);
+        const terrainPlain = await tgeo.getTerrainRgb(origin, radius, 12);
+        const { proj, unitsPerMeter } = tgeo.getProjection(origin, radius);
+        terrain.rotation.x = - Math.PI/2;
+
+
+        terrain.children.forEach(mesh => {
+
+            mesh.material.wireframe = true;
+
+        });
+
+
+        scene.add(terrain);
+
+
+        terrainPlain.rotation.x = - Math.PI/2;
+        terrainPlain.children.forEach(mesh => {
+            mesh.material.wireframe = false;
+            const position = mesh.geometry.attributes.position;
+            const arr = position.array;
+            for (let i = 0; i < arr.length; i += 3) {
+                arr[i+2] = 0; // set z value (height) to zero
+            }
+            position.needsUpdate = true;
+
+        });
+
+        scene.add(terrainPlain);
+
+
+        d3.xml('assets/Zuegen.gpx', 'application/xml', gpxParser);
+
+
+
+    })();
+
+
+
+
+
+
+
+
+
+
+
+
+
+</script>
+
+</body>
+</html>
