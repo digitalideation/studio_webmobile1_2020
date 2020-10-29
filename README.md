@@ -5,9 +5,9 @@
 
 # Studio WebMobile1 - Winter 2020
 
-This repository includes resources & course notes for students attending StudioWeb Mobile 1.
-Instructors: Maria Husmann and Hanna Züllig
-Term: Autumn 2020, HSLU
+This repository includes resources & course notes for students attending StudioWeb Mobile 1.<br/>
+Instructors: Maria Husmann and Hanna Züllig<br/>
+Term: Autumn 2020, HSLU<br/>
 * Intro to Web Maps and Story Maps
 * MapBox Studio and JS GL API
 * Contenful CMS
