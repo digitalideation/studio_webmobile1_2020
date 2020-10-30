@@ -12,6 +12,7 @@ Term: Autumn 2020, HSLU<br/>
 * MapBox Studio and JS GL API
 * Contenful CMS
 * Vue.js
+* Continuous cloud deployment with Netlify
 
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](http://opensource.org/licenses/MIT)
