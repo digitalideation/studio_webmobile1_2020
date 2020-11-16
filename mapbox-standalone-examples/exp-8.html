@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Load Trail -- mappa.js</title>
+    <!-- p5 -->
+    <script src="lib/p5.min.js"></script>
+
+    <!-- Mappa -->
+    <script src="lib/mappa.js"></script>
+</head>
+<body>
+
+</body>
+</html>
+
+<script>
+    var canvas;
+    var myMap;
+    var tripsCoordinates;
+    var allCoordinates = [];
+    var data;
+
+    var delta = 0;
+    var coordinate = 0;
+
+    var origin;
+    var originVector;
+    var destination;
+    var destinationVector;
+
+
+
+    var visitedRoutes = []; // A new array to hold all visited positions
+
+    let key="pk.eyJ1IjoiaHp1ZWxsaWciLCJhIjoiOTdZTU9tNCJ9.sP_-Qq6GiVd1zjzhDMttcQ";
+    var options = {
+        lat: 0,
+        lng: 0,
+        zoom: 1,
+        width: 640,
+        height: 640,
+        scale: 1,
+        pitch: 0,
+        style: 'mapbox://styles/mapbox/traffic-night-v2'
+    }
+
+    // Create an instance of MapboxGL
+    const mappa = new Mappa('MapboxGL', key);
+
+
+
+    function preload() {
+        data = loadJSON('./assets/route_Produktion_WhiteShirt_TotalRoute2.json');
+    }
+
+    function setup() {
+        canvas = createCanvas(windowWidth, windowHeight);
+        myMap = mappa.tileMap(options);
+        myMap.overlay(canvas);
+        tripsCoordinates = myMap.geoJSON(data, "LineString");
+
+        tripsCoordinates.forEach(function (trip) {
+            trip.forEach(function (coordinate) {
+                allCoordinates.push(coordinate)
+            })
+        });
+
+
+        //myMap.onChange(drawPoints);
+        myMap.onChange(drawRoute); // Everytime the map is zoomed or moved update the route
+    }
+
+    function draw(){
+        //clear(); clear can be commented since drawRoute() will handle clearing the canvas
+        if(delta < 1){
+            delta += 0.2;
+        } else {
+            visitedRoutes.push(allCoordinates[coordinate]) // Once it has arrived at its destination, add the origin as a visited location
+            delta = 0;
+            coordinate++;
+            drawRoute(); // Call the drawRoute to update the route
+        }
+
+        origin = myMap.latLngToPixel(allCoordinates[coordinate][1], allCoordinates[coordinate][0]);
+        originVector = createVector(origin.x, origin.y);
+        destination = myMap.latLngToPixel(allCoordinates[coordinate + 1][1], allCoordinates[coordinate + 1][0]);
+        destinationVector = createVector(destination.x, destination.y);
+
+        pointPosition = originVector.lerp(destinationVector, delta);
+
+        noStroke(); // remove the stroke from the route
+        fill(255,255,255);
+        ellipse(pointPosition.x, pointPosition.y, 3, 3);
+    }
+
+    function drawPoints(){
+        clear()
+        noStroke();
+        fill(255);
+        for(var i = 0; i < allCoordinates.length; i++){
+            var pos = myMap.latLngToPixel(allCoordinates[i][1], allCoordinates[i][0])
+            ellipse(pos.x, pos.y, 3, 3);
+        }
+    }
+
+    // This functions draws a line with n-vertices where n = visited routes;
+    function drawRoute(){
+        clear();
+        stroke(255,255,255, 200); // stroke color and width to see the route line
+        strokeWeight(1);
+        if(visitedRoutes.length > 0){
+            noFill();
+            beginShape();
+            visitedRoutes.forEach(function (e) {
+                var pos = myMap.latLngToPixel(e[1], e[0]);
+                vertex(pos.x, pos.y);
+            })
+            endShape()
+        }
+    }
+
+</script>
