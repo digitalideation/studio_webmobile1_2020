@@ -20,23 +20,23 @@ Term: Autumn 2020, HSLU<br/>
 
 
 # Students Projects
-Github	https://github.com/stumi/webmobile1
-ProjektURL	https://webmobile1.stumi.codes/#/
-
-Github	https://github.com/merchaz/planetenweg2.0
-ProjektURL https://digitalplanetenweg.netlify.com
-
-Github	https://github.com/seimon-m/flushway
-ProjektURL https://flushway.netlify.app
-
-Github	https://github.com/DMaag-14/biertour
-ProjektURL https://biertour.netlify.app/
-
-Github	https://github.com/OblivionLS/webmobile
-ProjektURL https://web-mobile.netlify.app/#/
-
-Github	https://github.com/hon3ypi/fasnacht/
-ProjektURL https://fasnacht.netlify.app
-
-Github	https://github.com/Edoard00/vue_project
-ProjektURL https://stoic-albattani-e984a3.netlify.app
+Github	https://github.com/stumi/webmobile1<br/>
+ProjektURL	https://webmobile1.stumi.codes/#/<br/>
+<br/>
+Github	https://github.com/merchaz/planetenweg2.0<br/>
+ProjektURL https://digitalplanetenweg.netlify.com<br/>
+<br/>
+Github	https://github.com/seimon-m/flushway<br/>
+ProjektURL https://flushway.netlify.app<br/>
+<br/>
+Github	https://github.com/DMaag-14/biertour<br/>
+ProjektURL https://biertour.netlify.app/<br/>
+<br/>
+Github	https://github.com/OblivionLS/webmobile<br/>
+ProjektURL https://web-mobile.netlify.app/#/<br/>
+<br/>
+Github	https://github.com/hon3ypi/fasnacht/<br/>
+ProjektURL https://fasnacht.netlify.app<br/>
+<br/>
+Github	https://github.com/Edoard00/vue_project<br/>
+ProjektURL https://stoic-albattani-e984a3.netlify.app<br/>
